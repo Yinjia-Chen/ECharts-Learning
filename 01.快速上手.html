@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <!-- 引入echarts.js -->
+  <script src="./lib/echarts.min.js"></script>
+
+</head>
+
+<body>
+  <!-- 创建载体盒子 -->
+  <div style="width: 600px;height: 400px;"></div>
+
+  <script>
+    // 初始化 echarts 实例对象
+    // 参数：dom元素 决定图表最终呈现的位置
+    var mCharts = echarts.init(document.querySelector('div'))
+
+    // 简单配置项：一个配置对象
+    var option ={
+      // x轴
+      xAxis:{
+        type:'category',
+        data:['小明','小红','小王']
+      },
+      // y轴
+      yAxis:{
+        type:'value'
+      },
+      series:[
+        {
+          name:'语文',
+          type:'bar',
+          data:[70,92,87]
+        }
+      ]
+    }
+
+    // 将配置对象设置给echarts实例对象
+    mCharts.setOption(option)
+
+  </script>
+</body>
+
+</html>
