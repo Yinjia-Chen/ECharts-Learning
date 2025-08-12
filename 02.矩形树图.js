@@ -73,9 +73,9 @@ const option = {
     formatter: (info) => {
       const { data } = info;
       return `
-  <div style="font-weight:600;margin-bottom:4px;">${data.fundname}</div>
-  规模：${data.scale}
-  `;
+        <div style="font-weight:600;margin-bottom:4px;">${data.fundname}</div>
+        规模：${data.scale}
+      `;
     }
   },
   series: [{
