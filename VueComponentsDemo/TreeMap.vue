@@ -7,9 +7,11 @@
 <script>
 import { ref, reactive, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
+import { formatBig, digitToPercent, formatCurrency } from '@/common/utils/commonUtils';
 
 export default {
   name: 'TreeMap',
+  emits: ['graph-click'],
   props: {
     chartData: { // 数据源: [{ fund_name, scale }, ...]
       type: Array,
@@ -21,7 +23,7 @@ export default {
     },
     fundNameKey: { // 自定义基金名称字段名
       type: String,
-      default: 'fund_name'
+      default: 'name'
     },
     scaleKey: { // 自定义规模字段名
       type: String,
@@ -34,9 +36,14 @@ export default {
     height: { // 图表容器高度
       type: [String, Number],
       default: '100%'
+    },
+    format: { // large / percent / currency
+      type: String,
+      default: '',
+      validator: v => ['', 'large', 'percent', 'currency'].includes(v)
     }
   },
-  setup(props) {
+  setup(props, { emit }) {
     const chartDom = ref()
     let treeMapChart = reactive({})
 
@@ -45,6 +52,21 @@ export default {
       width: normalizeSize(props.width),
       height: normalizeSize(props.height)
     })
+
+    // 格式化 scale
+    function formatScale(v) {
+      if (v === undefined || v === null || v === '') return ''
+      switch (props.format) {
+        case 'large':
+          return formatBig(v)
+        case 'percent':
+          return digitToPercent(v) // 默认保留 common.js 中 digit=2
+        case 'currency':
+          return formatCurrency(v)
+        default:
+          return v
+      }
+    }
 
     // 透明度控制
     const BASE_RGB = [87, 129, 253]
@@ -95,18 +117,30 @@ export default {
         trigger: 'item',
         formatter: info => {
           const d = info.data || {}
-          return `<div style="font-weight:600;font-size:${props.fontSize}px;margin-bottom:4px;">${d.fund_name || ''}</div>规模：${d.scale || ''}`
+          const name = d.fund_name || d.name || ''
+          return `${name}: ${formatScale(d.scale)}`
         }
       },
       series: [
         {
           type: 'treemap',
           roam: false,
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
           nodeClick: false,
           breadcrumb: { show: false },
           label: {
             show: true,
-            formatter: '{b}',
+            formatter: params => {
+              const d = params.data || {}
+              const name = d.fund_name || d.name || ''
+              const val = d.scale
+              if (val === undefined || val === null || val === '') return name
+              // 始终按 large 规则格式化
+              return `${name} (${formatBig(val)})`
+            },
             fontSize: props.fontSize,
             overflow: 'truncate'
           },
@@ -121,6 +155,15 @@ export default {
       ]
     })
 
+    // 绑定点击事件，返回info
+    const bindClick = () => {
+      if (!treeMapChart || !treeMapChart.on) return
+      treeMapChart.off?.('click')
+      treeMapChart.on('click', info => {
+        emit('graph-click', info?.data) // params.data.raw 为原始数据
+      })
+    }
+
     const chartDraw = () => {
       if (treeMapChart) {
         try { treeMapChart.dispose() } catch (e) { /* ignore dispose errors */ }
@@ -129,6 +172,7 @@ export default {
       option.series[0].data = mapData(props.chartData)
       treeMapChart.clear()
       treeMapChart.setOption(option, true)
+      bindClick()
     }
 
     // 监听数据变化重新渲染作画
@@ -158,12 +202,26 @@ export default {
         // 更新 option 中所有与字体大小相关的字段
         option.tooltip.formatter = info => {
           const d = info.data || {}
-          return `<div style="font-weight:600;font-size:${props.fontSize}px;margin-bottom:4px;">`
-            + `${d.fund_name || ''}</div>规模：${d.scale || ''}`
+          const name = d.fund_name || d.name || ''
+          return `${name}: ${formatScale(d.scale)}`
         }
         option.series[0].label.fontSize = props.fontSize
         // mapData 里也会因为 props.fontSize 变化而生效
         chartDraw()
+      }
+    )
+
+    // 当格式类型变化时也更新 tooltip（若父组件动态切换）
+    watch(
+      () => props.format,
+      () => {
+        option.tooltip.formatter = info => {
+          const d = info.data || {}
+          const name = d.fund_name || d.name || ''
+          return `${name}: ${formatScale(d.scale)}`
+        }
+        // 仅更新 tooltip，无需重建
+        treeMapChart && treeMapChart.setOption({ tooltip: option.tooltip }, false)
       }
     )
 
